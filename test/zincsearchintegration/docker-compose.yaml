@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  zinc:
+    image: public.ecr.aws/zinclabs/zincsearch:latest
+    container_name: zinc_loggcollector
+    env_file:
+      - .env
+    environment:
+      - ZINC_FIRST_ADMIN_USER=${ZINC_USER}
+      - ZINC_FIRST_ADMIN_PASSWORD=${ZINC_PASSWORD}
+    ports:
+      - "4080:4080"
+    volumes:
+      - zinc_loggcollector_data:/data
+
+volumes:
+  zinc_loggcollector_data:
