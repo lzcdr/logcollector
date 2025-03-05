@@ -35,7 +35,12 @@ func main() {
 	}
 	bufferTimeout := time.Duration(bufferTimeoutValue) * time.Second
 
-	logCollector, err := logcollector.NewLogCollector(ctx, zincIndexName, logFile, zincURL, zincUser, zincPass, bufferSize, bufferTimeout)
+	logCollector, err := logcollector.NewLogCollector(
+		ctx,
+		zincIndexName, logFile, zincURL, zincUser, zincPass, bufferSize, bufferTimeout,
+		func(logLine string) string {
+			return logLine
+		})
 	if err != nil {
 		log.Fatalf("Failed to start log collector: %v", err)
 	}

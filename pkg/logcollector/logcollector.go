@@ -14,10 +14,11 @@ import (
 	"github.com/hpcloud/tail"
 )
 
+type LogLineProcessingFunc func(logLine string) string
+
 type LogEntry struct {
-	Timestamp time.Time `json:"@timestamp"`
-	Message   string    `json:"message"`
-	File      string    `json:"file"`
+	Message any    `json:"message"`
+	File    string `json:"file"`
 }
 
 type ZincPayload struct {
@@ -38,6 +39,7 @@ type LogCollector struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
 	timer      *time.Timer
+	proc       LogLineProcessingFunc
 }
 
 func NewLogCollector(
@@ -45,7 +47,8 @@ func NewLogCollector(
 	zincIndexName string,
 	filePath, zincURL, zincUser, zincPass string,
 	bufferSize int,
-	bufferTimeout time.Duration) (*LogCollector, error) {
+	bufferTimeout time.Duration,
+	logProcFunc LogLineProcessingFunc) (*LogCollector, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
@@ -64,9 +67,10 @@ func NewLogCollector(
 		watcher:    watcher,
 		ctx:        ctx,
 		cancel:     cancel,
+		proc:       logProcFunc,
 	}
 
-	lc.timer = time.AfterFunc(10*time.Second, func() { lc.flushBuffer() })
+	lc.timer = time.AfterFunc(bufferTimeout, func() { lc.flushBuffer() })
 
 	go lc.watchFile()
 	go lc.tailFile()
@@ -115,11 +119,19 @@ func (lc *LogCollector) tailFile() {
 
 func (lc *LogCollector) processLog(log string) {
 	var entry LogEntry
-	if json.Valid([]byte(log)) {
-		json.Unmarshal([]byte(log), &entry)
-	} else {
-		entry = LogEntry{Timestamp: time.Now(), Message: log, File: lc.FilePath}
+
+	if lc.proc != nil {
+		log = lc.proc(log)
 	}
+
+	if json.Valid([]byte(log)) {
+		var msg any
+		json.Unmarshal([]byte(log), &msg)
+		entry = LogEntry{Message: msg, File: lc.FilePath}
+	} else {
+		entry = LogEntry{Message: log, File: lc.FilePath}
+	}
+
 	lc.addToBuffer(entry)
 }
 
